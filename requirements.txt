@@ -1,0 +1,11 @@
+
+pyyaml >= 3.11
+redis
+gevent == 0.4.9
+sqlalchemy == 1.0.5
+requests == 2.9.1
+pyquery == 1.2.9
+
+mysql-connector-python >= 2.0.4
+
+#yum -y install libxslt-devel

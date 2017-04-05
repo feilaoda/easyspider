@@ -25,7 +25,7 @@ except ImportError:
 import logging
 logging.basicConfig(format='%(asctime)s:%(levelname)s:%(thread)d:%(module)s:%(funcName)s:%(lineno)d:%(message)s', level=logging.DEBUG)
 
-# logging.basicConfig(filename='spider.log',format='%(levelname)s:%(thread)d:%(message)s', level=logging.DEBUG)
+# logging.basicConfig(filename='log/spider.log',format='%(levelname)s:%(thread)d:%(message)s', level=logging.DEBUG)
 
 #print('run')
 # from easyspider.utils import  TestClass

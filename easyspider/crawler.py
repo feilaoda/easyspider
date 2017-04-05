@@ -21,6 +21,13 @@ from .db import Session, ScopedSession, SpiderProject, SpiderTask, SpiderSchedul
 from .cron import CronJob
 from .processor import EasyProcessor
 
+try:
+    from settings import redis_host, redis_port
+except Exception:
+    redis_host = "localhost"
+    redis_port = 6379
+else:
+    pass
 OK=True
 START=1
 STOP=-1
@@ -39,7 +46,7 @@ class EasyCrawler:
         
         self.timeout = timeout
         self.loop_once = loop_once
-        self.qin = build_queue("redis", qname="command_q")
+        self.qin = build_queue("redis", host=redis_host, qname="command_q")
         # self.qout = build_queue("redis") 
         
         self.jobs['processors'] = {}
