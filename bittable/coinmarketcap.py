@@ -14,11 +14,15 @@ import datetime
 import json
 from decimal import Decimal
 
+from mq import build_queue
 
 engine = create_engine("mysql+mysqlconnector://root:Sanquan2018!@192.168.0.232/bittable?charset=utf8")
 #engine = create_engine("mysql+mysqlconnector://root:admin@localhost/bittable?charset=utf8")
 
 Session = sessionmaker(bind=engine, autoflush=True, autocommit=False)
+
+data_queue = build_queue(qname="q_coinmarketcap_5min", host='192.168.0.241', port=6379)
+
 
 ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
 class BaseClass(object):
@@ -201,6 +205,9 @@ def catch_data(site_name, coin_name, url, data_type):
     db.commit()
     db.close()
     # print(prices)
+    if len(prices) > 0:
+        qdata = {'site': "coinmarketcap", 'currency':coin_name, 'prices': prices}
+        data_queue.put(qdata)
 
 
 Symbols={

@@ -41,10 +41,10 @@ def fetch_5min_data(from_date, coin_name):
     # sleep(1)
 
 
-old_day = datetime.datetime.now() - datetime.timedelta(days=7) #6年前
+old_day = datetime.datetime.now() - datetime.timedelta(days=1) #6年前
 # from_date = datetime.datetime(2013,5,1,0,0,0)
 #fetch_5min_data(old_day, 'bitcoin')
-fetch_5min_data(old_day, 'eos')
+fetch_5min_data(old_day, 'bitcoin')
 
 # fetch_5min_data(from_date, 'ethereum')
 
