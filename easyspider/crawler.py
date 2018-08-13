@@ -17,7 +17,7 @@ from .utils import merge_cookie, load_module
 from .mq import build_queue
 from .fetcher import Fetcher
 from .config import import_config, Config
-from .db import Session, ScopedSession, SpiderProject, SpiderTask, SpiderScheduler,SpiderResult
+from .db import Session, ScopedSession, SpiderProject, SpiderTask, SpiderScheduler,get_result_class
 from .cron import CronJob
 from .processor import EasyProcessor
 
@@ -43,18 +43,18 @@ class EasyCrawler:
         self.jobs = {}
 
         self.pool = Pool(1000)
-        
+
         self.timeout = timeout
         self.loop_once = loop_once
         self.qin = build_queue("redis", host=redis_host, qname="command_q")
-        # self.qout = build_queue("redis") 
-        
+        # self.qout = build_queue("redis")
+
         self.jobs['processors'] = {}
         self.jobs['common_tasks'] = []
-        
+
         self.load_spiders()
         # print("projects:",self.projects)
-        
+
         # self.jobs['loader'] = self.pool.spawn(self.do_loader)
 
         # self.queues['common'] = build_queue("redis", qname="common_q")
@@ -71,7 +71,7 @@ class EasyCrawler:
         # self.job_count = len(self.jobs)
         # self.lock = threading.Lock()
         self.fetcher = Fetcher()
-        
+
 
     def load_spiders(self):
         projects =  SpiderProject.load_projects() #query.filter_by(status=1).all()
@@ -81,21 +81,21 @@ class EasyCrawler:
 
         for project_name in names:
             self._load_project(project_name)
-            
-        
+
+
         # logging.debug("task queues:", self.queues)
 
     def shutdown(self):
         self.pool.kill()
 
     def start(self):
-        
+
         self.jobs['scheduler'] = self.pool.spawn(self.do_scheduler)
         self.jobs['command'] = self.pool.spawn(self.do_command)
         self.pool.join()
         # self.pool.start(self.jobs['scheduler'])
         # self.pool.start(self.jobs['command'])
-        
+
         # gevent.joinall(jobs)
 
     def do_command(self):
@@ -140,7 +140,7 @@ class EasyCrawler:
 
     #     if file_ext.lower() == '.py':
     #         py_mod = imp.load_source(mod_name, filepath)
-            
+
     #     if hasattr(py_mod, expected_class):
     #         class_name = getattr(py_mod, expected_class)
 
@@ -195,34 +195,34 @@ class EasyCrawler:
         return self._load_processor(project)
 
 
-    def _load_processor(self, project):
-        logging.debug("load processor %s" % project)
+    def _load_processor(self, project_name):
+        logging.debug("load processor %s" % project_name)
         try:
-            dbproject = SpiderProject.query.filter_by(name=project).first()
+            dbproject = SpiderProject.query.filter_by(name=project_name).first()
             if dbproject is None:
                 logging.error("project %s not exits, can't loading." % project)
                 return
             newproject = Config()
-            newproject.name = project
+            newproject.name = project_name
             newproject.load_time = time.time()
             if dbproject.queue_name is None:
                 newproject.queue_name = dbproject.name
             else:
                 newproject.queue_name = dbproject.queue_name
 
-            spider_cls = load_module("projects/%s/spider.py" % project)# import_object("projects.%s.spider.Spider"% (project))
+            spider_cls = load_module("projects/%s/spider.py" % project_name)# import_object("projects.%s.spider.Spider"% (project))
             if spider_cls is None:
-                logging.error("import module %s error.!" % project)
+                logging.error("import module %s error.!" % project_name)
                 return
-            logging.debug("import spider %s" % project)
-            config = import_config("projects/%s/project.yaml" % (project))
+            logging.debug("import spider %s" % project_name)
+            config = import_config("projects/%s/project.yaml" % (project_name))
             spider = spider_cls()
             spider.config = config
             spider.status = START
-            
-            self.spiders[project] = spider
-            self.projects[project] = newproject
-            queue_name = 'q_'+project #+"_"+str(int(time.time()))
+
+            self.spiders[project_name] = spider
+            self.projects[project_name] = newproject
+            queue_name = 'q_'+project_name #+"_"+str(int(time.time()))
             spider._on_start()
             # if new_tasks is not None:
             #     queue = build_queue('redis', queue_name)# self.queues.get(newproject.queue_name)
@@ -231,16 +231,16 @@ class EasyCrawler:
             #     queue.close()
 
             if newproject.queue_name != 'common':
-                
-                self.queues[project] = queue_name #build_queue("redis", qname="q_"+project)
-                processor = EasyProcessor(project, spider, queue_name)
+
+                self.queues[project_name] = queue_name #build_queue("redis", qname="q_"+project)
+                processor = EasyProcessor(project_name, spider, queue_name)
                 job = self.pool.spawn(processor.run)
-                self.jobs['processors'][project] = job
+                self.jobs['processors'][project_name] = job
                 # self.pool.start(job)
-                self.processors[project] = processor
+                self.processors[project_name] = processor
                 return job
 
-            
+
         except Exception as e:
             logging.error("load spider!\n%s" % traceback.format_exc())
             raise e
@@ -252,7 +252,7 @@ class EasyCrawler:
         if old_project is None:
             return
 
-        
+
         if old_project.queue_name != 'common':
             qname = self.processors.get(project)
             if qname is not None:
@@ -287,19 +287,19 @@ class EasyCrawler:
                     logging.debug("project [%s] doesn't started." % (s.project))
                     continue
 
-                if s.process is None or s.process == "":
-                    process = {}
+                if s.params is None or s.params == "":
+                    params = {}
                 else:
-                    process = json.loads(s.process)
+                    params = json.loads(s.params)
                 task = {}
                 task['type'] = 'scheduler'
                 task['id'] = s.id
 
                 task['project'] = s.project
                 task['task_id'] = s.task_id
-                task['url'] = s.url
-                if 'crontab' in process:
-                    crons = process.get('crontab')
+                task['method'] = s.method
+                if 'crontab' in params:
+                    crons = params.get('crontab')
                     cronjob = CronJob(crons)
                     next_time = cronjob.next(now)
                     # print("do scheduler", crons, now, nowts,next_time)
@@ -307,9 +307,7 @@ class EasyCrawler:
                     s.last_time = nowts
                     self.db.add(s)
 
-                if 'callback' in process:
-                    task['callback'] = process.get('callback')
-                
+               
                 project = self.projects.get(s.project)
                 if project is not None:
                     inqname = self.queues.get(s.project)
@@ -318,7 +316,7 @@ class EasyCrawler:
                     inq.put_first(task)
                     inq.close()
                 new_projects.append(s.project)
-               
+
             self.db.commit()
             logging.debug("load new projects :%s"% str(new_projects))
             for project in new_projects:
@@ -334,7 +332,7 @@ class EasyCrawler:
 
     # def do_loader(self):
     #     try:
-           
+
     #         while True:
     #             now = time.time()
     #             for k,project in self.projects.items():
@@ -348,12 +346,12 @@ class EasyCrawler:
     #                 taskq = self.queues.get(project.queue_name)
     #                 if (project.queue_name != 'common' and taskq.qsize() > 0) or (project.queue_name=='common' and taskq.qsize() >= 1000):
     #                     continue
-                    
+
     #                 new_tasks = self._load_tasks(project.name)
     #                 tasks_size = len(new_tasks)
     #                 if tasks_size <= 0:
     #                     logging.info('project [%s] load no task' % project.name)
-    #                     #project.load_time = now + 10*1000 
+    #                     #project.load_time = now + 10*1000
     #                     continue
     #                 else:
     #                     logging.info('project [%s] load %d tasks' % (project.name, tasks_size))
@@ -365,101 +363,108 @@ class EasyCrawler:
     #                 gevent.sleep(2)
     #     except Exception as e:
     #         logging.error("Scheduler Error!\n%s" % traceback.format_exc())
-        
 
-    def do_worker(self, project):
 
-        try:
-            # task = self.qin.get()
-            taskq = self.queues.get(project.name)
-            
-            while True:
+    # def do_worker(self, project):
 
-                try:
-                    task = taskq.get()
-                    if task == StopIteration or task == '':
-                        logging.info("worker [%s] get none task, exit do worker" % (project.name))
-                        break
-                    if task is None:
-                        gevent.sleep(2)
-                        logging.info("worker [%s] get no task, sleep 2 seconds" % (project.name))
-                        continue
+    #     try:
+    #         # task = self.qin.get()
+    #         taskq = self.queues.get(project.name)
 
-                    logging.info("do worker get a task", task) 
-                    project_name = task.get('project')
-                    if project_name is None:
-                        logging.error("worker get a task from queue [%s] has no project, ignore. %s" % (project.queue_name, json.dumps(task)))
-                        continue
-                    spider = self.spiders.get(project_name)
-                    if spider is None:
-                        logging.error("worker [%s] get no task, no spider, continue" % (project_name))
-                        continue
-                    # print("project %s task: " % project, task)
-                    self.do_fetch(project_name, spider, task)
-                except GreenletExit as ge:
-                    # logging.info("Worker %s ")
-                    pass
-                except:
-                    logging.error("Worker error!\n%s" % traceback.format_exc())
+    #         while True:
 
-        
-                
-        finally:
-            
-            logging.debug("Worker done, ==========================  job count: %s" % project_name)
+    #             try:
+    #                 task = taskq.get()
+    #                 if task == StopIteration or task == '':
+    #                     logging.info("worker [%s] get none task, exit do worker" % (project.name))
+    #                     break
+    #                 if task is None:
+    #                     gevent.sleep(2)
+    #                     logging.info("worker [%s] get no task, sleep 2 seconds" % (project.name))
+    #                     continue
 
-    
-    def do_fetch(self, project, spider, task):
-        logging.debug("do fetch task: %s" % task)
-        if project != task['project']:
-            pass
-        headers = spider.config.headers
-        url = task.get('url')
-        task_id = task.get('task_id')
-        if url.startswith('data://'):
-            callback = task.get('callback')
-            if callback is not None:
-                callback_func = getattr(spider, callback)
-                if callback_func:
-                    callback_func()
-        else:
-            response = self.fetcher.fetch(spider, task, headers)
-            if 'set-cookie' in response:
-                new_cookie = response['set-cookie']
-                old_cookie = headers.get('Cookie', None)
-                headers['Cookie'] = merge_cookie(new_cookie, old_cookie)
+    #                 logging.info("do worker get a task", task)
+    #                 project_name = task.get('project')
+    #                 if project_name is None:
+    #                     logging.error("worker get a task from queue [%s] has no project, ignore. %s" % (project.queue_name, json.dumps(task)))
+    #                     continue
+    #                 spider = self.spiders.get(project_name)
+    #                 if spider is None:
+    #                     logging.error("worker [%s] get no task, no spider, continue" % (project_name))
+    #                     continue
+    #                 # print("project %s task: " % project, task)
+    #                 rescode = self.do_fetch(project_name, spider, task)
+    #                 if rescode == 400 or rescode == 403:
+    #                     gevent.sleep(3)
+    #                 else:
+    #                     gevent.sleep(1)
+    #             except GreenletExit as ge:
+    #                 # logging.info("Worker %s ")
+    #                 pass
+    #             except:
+    #                 logging.error("Worker error!\n%s" % traceback.format_exc())
 
-            result_code = response['code']
-            if 'result' in response:
-                res = response['result']
-                if 'code' in res:
-                    result_code = res['code']
-                sr = SpiderResult.query.filter_by(task_id=task_id).first()
-                if sr is None:
-                    sr = SpiderResult()
-                sr.project = task.get('project')
-                sr.task_id = task_id
-                sr.url = url
-                sr.content = json.dumps(res)
-                sr.create_at = datetime.datetime.now()
-                self.db.add(sr)
-            st = SpiderTask.query.filter_by(task_id=task_id).first()
-            if st is None:
-                return
-            st.status = result_code
-            st.last_time = time.time()
-            self.db.add(st)
-            self.db.commit()
-            # if 'process' in task:
-            #     cb_name = task.get('process').get('callback')
-            #     callback = getattr(spider, cb_name)
-            #     if callback:
-            #         callback(response)
 
+
+    #     finally:
+
+    #         logging.debug("Worker done, ==========================  job count: %s" % project_name)
+
+
+    # def do_fetch(self, project_name, spider, task):
+    #     logging.debug("do fetch task: %s, http headers: %s" % (task, spider.config.http_headers))
+    #     if project_name != task['project']:
+    #         pass
+    #     headers = spider.config.http_headers
+    #     url = task.get('url')
+    #     task_id = task.get('task_id')
+    #     if url.startswith('data://'):
+    #         callback = task.get('callback')
+    #         if callback is not None:
+    #             callback_func = getattr(spider, callback)
+    #             if callback_func:
+    #                 callback_func()
+
+    #         return None
+    #     else:
+    #         response = self.fetcher.fetch(spider, task, headers)
+    #         if 'set-cookie' in response:
+    #             new_cookie = response['set-cookie']
+    #             old_cookie = headers.get('Cookie', None)
+    #             headers['Cookie'] = merge_cookie(new_cookie, old_cookie)
+
+    #         result_code = response['code']
+    #         ResultClass = get_result_class(project_name)
+    #         if 'result' in response:
+    #             res = response['result']
+    #             if 'code' in res:
+    #                 result_code = res['code']
+    #             sr = ResultClass.query.filter_by(task_id=task_id).first()
+    #             if sr is None:
+    #                 sr = ResultClass()
+    #             sr.project = task.get('project')
+    #             sr.task_id = task_id
+    #             sr.url = url
+    #             sr.content = json.dumps(res)
+    #             sr.create_at = datetime.datetime.now()
+    #             self.db.add(sr)
+    #         st = SpiderTask.query.filter_by(task_id=task_id).first()
+    #         if st is None:
+    #             return
+    #         st.status = result_code
+    #         st.last_time = time.time()
+    #         self.db.add(st)
+    #         self.db.commit()
+    #         # if 'process' in task:
+    #         #     cb_name = task.get('process').get('callback')
+    #         #     callback = getattr(spider, cb_name)
+    #         #     if callback:
+    #         #         callback(response)
+    #         return result_code
 
     def _load_tasks(self, project):
         tasks = SpiderTask.query.filter(SpiderTask.project==project, SpiderTask.status==0).order_by('priority').limit(30).all()
-        
+
         new_tasks = []
         for task in tasks:
             task.status = 1
@@ -493,13 +498,11 @@ class EasyCrawler:
     #                     i+=1
     #                     pipeline_size += 1
     #                     results.append(self.qout.get_nowait())
-                        
+
     #                 if len(results) > 0:
     #                     self.spider.pipeline(results)
     #             except queue.Empty:
     #                 if len(results) > 0:
     #                     self.spider.pipeline(results)
     #         except:
-    #             logging.error("Pipeline error!\n%s" % traceback.format_exc()) 
-        
-
+    #             logging.error("Pipeline error!\n%s" % traceback.format_exc())

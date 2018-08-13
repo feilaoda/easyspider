@@ -19,6 +19,8 @@ class BaseClass(object):
 
 Base = declarative_base(cls=BaseClass)
 
+
+
 class SpiderProject(Base):
     __tablename__ = 'spider_project'
     id = Column(Integer, primary_key=True)
@@ -36,64 +38,79 @@ class SpiderProject(Base):
         projects = SpiderProject.query.filter(SpiderProject.status==1).all()
         return projects
 
-class SpiderTask(Base):
-    __tablename__ = 'spider_task'
-    id = Column(Integer, primary_key=True)
-    project = Column(String)
-    task_id = Column(String)
-    url = Column(String)
-    callback = Column(String)
-    priority = Column(Integer)
-    #next_time = Column(Integer)
-    last_time = Column(Integer)
-    status = Column(Integer)
-    result = Column(String)
-    create_at = Column(DateTime, default=datetime.datetime.now())
 
-    @classmethod
-    def load_tasks(cls, project):
-        #tasks = SchedulerTask.query.filter(SchedulerTask.project==project, SchedulerTask.status==0).order_by('priority').limit(30).all()
-        tasks = SchedulerTask.query.filter_by(project=project, status=0).order_by('priority').limit(30).all()
-        
-        db = Session()
-        new_tasks = []
-        for task in tasks:
-            task.status = 1
-            db.add(task)
-            new_task={}
-            new_task['id'] = task.id
-            new_task['task_id'] = task.task_id
-            new_task['project'] = task.project
-            new_task['url'] = task.url
-            new_task['process'] = task.process
-            new_tasks.append(new_task)
-        db.commit()
-        db.close()
-        return new_tasks
-Task = SpiderTask
-
+ 
 
 class SpiderScheduler(Base):
     __tablename__ = 'spider_scheduler'
     id = Column(Integer, primary_key=True)
     project = Column(String)
     task_id = Column(String) #data://project/on_start
-    url = Column(String) # data://on_start   http://
-    process = Column(String) #{callback: '', 'crontab'}
+    #url = Column(String) # data://on_start   http://
+    #process = Column(String) #{callback: '', 'crontab'}
+    method = Column(String)
+    params = Column(String)
     next_time = Column(Integer)
     last_time = Column(Integer)
     create_at = Column(DateTime, default=datetime.datetime.now())
 
 
-class SpiderResult(Base):
-    __tablename__ = 'spider_result'
-    id = Column(Integer, primary_key=True)
-    project = Column(String)
-    task_id = Column(String)
-    url = Column(String)
-    content = Column(String)
-    create_at = Column(DateTime, default=datetime.datetime.now())
+# class SpiderResult(Base):
+#     __tablename__ = 'spider_result'
+#     id = Column(Integer, primary_key=True)
+#     project = Column(String)
+#     task_id = Column(String)
+#     url = Column(String)
+#     content = Column(String)
+#     create_at = Column(DateTime, default=datetime.datetime.now())
 
-Result = SpiderResult
+def get_result_class(table_name):
+    DynamicBase = declarative_base(class_registry=dict())
 
+    class SpiderResult(DynamicBase):
+        query =  ScopedSession.query_property()
+        __tablename__ = "spider_result_" + table_name 
+        task_id = Column(String, primary_key=True)
+        url = Column(String)
+        result = Column(String)
+        updated_at = Column(DateTime, default=datetime.datetime.now())
+    return SpiderResult
+
+def get_task_class(table_name):
+    DynamicBase = declarative_base(class_registry=dict())
+    
+    class SpiderTask(Base):
+        __tablename__ = 'spider_task' + table_name
+        query =  ScopedSession.query_property()
+        id = Column(Integer, primary_key=True)
+        #project = Column(String)
+        task_id = Column(String)
+        url = Column(String)
+        callback = Column(String)
+        priority = Column(Integer)
+        last_time = Column(Integer)
+        status = Column(Integer)
+        result = Column(String)
+        updated_at = Column(DateTime, default=datetime.datetime.now())
+
+        @classmethod
+        def load_tasks(cls):
+            #tasks = SchedulerTask.query.filter(SchedulerTask.project==project, SchedulerTask.status==0).order_by('priority').limit(30).all()
+            tasks = SchedulerTask.query.filter_by(status=0).order_by('priority').limit(30).all()
+            
+            db = Session()
+            new_tasks = []
+            for task in tasks:
+                task.status = 1
+                db.add(task)
+                new_task={}
+                new_task['id'] = task.id
+                new_task['task_id'] = task.task_id
+                #new_task['project'] = task.project
+                new_task['url'] = task.url
+                new_task['process'] = task.process
+                new_tasks.append(new_task)
+            db.commit()
+            db.close()
+            return new_tasks
 

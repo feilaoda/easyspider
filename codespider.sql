@@ -41,25 +41,20 @@ CREATE TABLE `spider_project` (
 -- Table structure for table `spider_result`
 --
 
-DROP TABLE IF EXISTS `spider_result_36kr`;
+DROP TABLE IF EXISTS `spider_result`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `spider_result_36kr` (
-  `task_id` varchar(32) NOT NULL,
+CREATE TABLE `spider_result` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `project` varchar(30) NOT NULL,
+  `task_id` varchar(64) NOT NULL,
   `url` varchar(1000) NOT NULL,
-  `result` MEDIUMTEXT,
-  `updated_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`task_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-CREATE TABLE `spider_result_juejin` (
-  `task_id` varchar(32) NOT NULL,
-  `url` varchar(1000) NOT NULL,
-  `result` MEDIUMTEXT,
-  `updated_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`task_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
+  `content` text,
+  `create_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_project` (`project`),
+  KEY `ix_task_id` (`task_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=7568 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -92,20 +87,21 @@ DROP TABLE IF EXISTS `spider_task`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `spider_task` (
-  `task_id` varchar(32) NOT NULL ,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `project` varchar(30) NOT NULL,
+  `task_id` varchar(64) NOT NULL,
   `url` varchar(1000) NOT NULL,
   `callback` varchar(100) DEFAULT NULL,
   `priority` int(11) NOT NULL DEFAULT '0',
   `last_time` int(11) DEFAULT NULL,
   `result` text,
   `status` int(11) NOT NULL,
-  `updated_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`task_id`),
+  `create_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
   KEY `ix_project` (`project`),
-  KEY `ix_priority` (priority),
+  KEY `ix_task_id` (`task_id`),
   KEY `ix_status` (`status`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=9853 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

@@ -26,14 +26,14 @@ def import_config(filename, default_config=None):
     #print config
     config = Config(new_config)
     config = convert_config_dict(config)
-    
-    headers = {}
-    if 'headers' in new_config:
-        for item in yaml_config['headers']:
-            name = item['name']
-            value = item['value']
-            headers[name] = value
-    config.headers = headers
+
+    print("new config", new_config)
+    http_headers = {}
+    if 'http_headers' in new_config:
+        for item in yaml_config['http_headers']:
+            for k,v in item.items():
+                http_headers[k] = v
+    config.http_headers = http_headers
     print(config)
     return config
 
@@ -58,4 +58,3 @@ def convert_config_dict(d):
             new_v = convert_config_list(v)
         new_dict[k] = new_v
     return new_dict
-

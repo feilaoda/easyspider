@@ -14,7 +14,7 @@ def monkey_patch():
         _content = prop.fget(self)
         #apparent_encoding = chardet.detect(_content)['encoding']
         #if apparent_encoding is None:
-            
+
         apparent_encoding = 'UTF-8'
         # print("encoding,",self.encoding,apparent_encoding,requests.utils.get_encodings_from_content(_content))
         # logging.debug("encoding %s, %s, %s" % (self.encoding,apparent_encoding,requests.utils.get_encodings_from_content(_content)))
@@ -28,7 +28,7 @@ def monkey_patch():
                 self.encoding = apparent_encoding
             _content = _content.decode(self.encoding, 'replace').encode('utf8', 'replace')
             self._content = _content
-        
+
         return _content
     requests.models.Response.content = property(content)
 
@@ -39,34 +39,35 @@ class Fetcher(object):
     """docstring for Fetcher"""
     def __init__(self):
         super(Fetcher, self).__init__()
-        
-        
+
+
     def fetch(self, spider, task, headers={}):
-        #logging.debug("fetch ====== %s" % task)
+        logging.debug("fetch ====== %s %s" % (task.get('url'), headers))
         url = task.get('url')
         is_target = task.get('is_target')
 
         callback = None
         if 'callback' in task and task.get('callback', None) is not None:
             callback = getattr(spider, task.get('callback', None))
-        
-        response = self._fetch(url, headers)
-        if response.get('code') == 200 and callback is not None:
-            res = callback(response)
+
+        response_cfg = self._fetch(url, headers)
+        if response_cfg.get('code') == 200 and callback is not None:
+            # res_content = response['content']
+            res = callback(response_cfg)
             if res is not None:
-                response['result'] = res
-                
+                response_cfg['result'] = res
+
                 #save res
                 #insert into spider_result(task_id, url, result)
                 # pass
-                    
+
         if task.get('type', None) == 'task':
             pass
             #update task status=response.get('code') where id=task['id']
-        return response
+        return response_cfg
 
     def _fetch(self, url, headers={}, timeout=20, proxies=None):
-        logging.debug("Download start ======== [%s], %s" % (url,type(url)))
+        logging.debug("Download start ======== %s, %s" % (url,type(url)))
 
         try:
             result = Config()
@@ -76,7 +77,7 @@ class Fetcher(object):
                 return dict(code=response.status_code)
 
             html = response.content
-            
+
             if 'Set-Cookie' in response.headers:
                 cookies = response.headers['Set-Cookie']
                 result['set-cookie'] = cookies
@@ -86,14 +87,13 @@ class Fetcher(object):
             result['content'] = html
             result['url'] = response.url
             result['old_url'] = url
-            result['doc'] = PyQuery(html)
+            if content_type == '':
+                result['doc'] = PyQuery(html)
             # logging.debug("Download end ======== [%s] %d" % (url, response.status_code))
             return result
 
         except Exception as e:
-            logging.error("fetch url:%s error \n%s" % (url,traceback.format_exc()))
+            logging.error("fetch url:%s get error \n%s" % (url,traceback.format_exc()))
             return dict(code=-1)
 
         return dict(code=-1)
-
-

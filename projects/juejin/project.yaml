@@ -1,0 +1,7 @@
+project: "juejin"
+group: "default"
+enable: "true"
+http_headers:
+  - X-LC-Id: "mhke0kuv33myn4t4ghuid4oq2hjj12li374hvcif202y5bm6"
+  - X-LC-Sign: "581ca77d4252a07ed96b86e5eb9d732c,1491386545904"
+  - X-LC-UA: "AV/js1.5.4"

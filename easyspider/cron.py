@@ -35,7 +35,7 @@ def every(crontab=[]):
         for c in crontab:
             if isinstance(c, str):
                 func._crons.append(c)
-                
+
                 # cols = c.split(' ')
                 # if len(cols) != 5:
                 #     continue
@@ -67,7 +67,7 @@ def config(age=None, priority=None):
 
 class CronConfig(object):
     def __init__(self, minute="*", hour="*", day="*", month="*", week=None):
-        
+
         """
         week优先
         """
@@ -85,7 +85,7 @@ class CronConfig(object):
         return "minute:"+str(self.minute)+" hour:"+str(self.hour)+" day:"+str(self.day)+" month:"+str(self.month)+" week:"+str(self.week)
 
     def _parse_piece(self, col, v):
-        
+
         vals = []
         if v is None:
             return []
@@ -113,7 +113,7 @@ class CronConfig(object):
             # for i in range(start,end+1, incr):
             #     vals.append(i)
             vals = list(range(start,end+1, incr))
-                
+
             if col == WEEK and 7 in vals:
                 vals.discard(7)
                 vals.append(0)
@@ -126,7 +126,7 @@ class CronTab(object):
         super(CronTab, self).__init__()
         cols = cron.split(' ')
         if len(cols) == 5:
-            
+
             m = cols[0]
             h = cols[1]
             d = cols[2]
@@ -137,9 +137,9 @@ class CronTab(object):
             cfg = CronConfig(m,h,d,month,week)
             # print(cfg)
             self.config = cfg
-    
+
     def array_min_pos(self, arr, val):
-        
+
         for i in range(0, len(arr)):
             if arr[i] >= val:
                 return i-1
@@ -171,13 +171,13 @@ class CronTab(object):
 
             if pos < 0:
                 pos = self.array_min_pos(arr,val)
-            
+
             if pos < 0:
                 pos = 0
             elif pos == len(arr):
                 pos = 0
             elif pos == len(arr)-1:
-                pos = 0 
+                pos = 0
                 go_next = True
             else:
                 pos = pos + 1
@@ -191,7 +191,7 @@ class CronTab(object):
 
     def go_next_hour(self, future):
         pos, go_next = self.next_pos(self.config.hour, future.hour)
-        future = future.replace(hour=self.config.hour[pos]) 
+        future = future.replace(hour=self.config.hour[pos])
         return (future, go_next)
 
     def go_next_day(self, future):
@@ -209,7 +209,7 @@ class CronTab(object):
         year = future.year+int(month/12)
         month = month % 12+1
         future = future.replace(year=year, month=month)# + datetime.timedelta(month=1)
-        
+
         return future
 
     def next(self, nowtime=None):
@@ -225,7 +225,7 @@ class CronTab(object):
                 future = self.add_next_month(future)
 
             future = future.replace(hour=self.config.hour[0], minute=self.config.minute[0])
-            
+
         elif not self.find_time(self.config.hour, future.hour):
             future, hour_go_next = self.go_next_hour(future)
             if hour_go_next:
@@ -247,7 +247,8 @@ class CronTab(object):
         delay = future - datetime.datetime(1970, 1, 1) #, tzinfo=datetime.timezone.utc)
         nextts = delay.days * 86400 + delay.seconds
         # print("job next time: ",future, future.timestamp(), nextts)
-        return future, future.timestamp() # + delay.microseconds / 1000000.
+        print("future type", future, type(future))
+        return future, nextts #future.timestamp() # + delay.microseconds / 1000000.
 
 
 
@@ -269,4 +270,3 @@ class CronJob(object):
                 first_time = next_timestamp
 
         return first_time
-        
