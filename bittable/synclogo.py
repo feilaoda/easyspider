@@ -68,6 +68,7 @@ for res in results:
         coin.browser1 = res_json['explorer1']
         coin.browser2 = res_json['explorer2']
         coin.browser3 = res_json['explorer3']
+        coin.total_supply = res_json['total_supply']
         print(coin.name, coin.src, coin.browser1)
         db2.add(coin)
         db2.commit()

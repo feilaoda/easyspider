@@ -14,14 +14,12 @@ import datetime
 import json
 from decimal import Decimal
 
-from mq import build_queue
 
 engine = create_engine("mysql+mysqlconnector://root:Sanquan2018!@192.168.0.232/bittable?charset=utf8")
 #engine = create_engine("mysql+mysqlconnector://root:admin@localhost/bittable?charset=utf8")
 
 Session = sessionmaker(bind=engine, autoflush=True, autocommit=False)
 
-data_queue = build_queue(qname="q_coinmarketcap_5min", host='192.168.0.241', port=6379)
 
 
 ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
@@ -60,6 +58,7 @@ class MarketCoin(Base):
     price = Column(DECIMAL(precision=18,scale=8))
     volume = Column(BigInteger)
     supply = Column(BigInteger)
+    total_supply = Column(BigInteger)
     change24h = Column(DECIMAL)
     change12h = Column(DECIMAL)
     change6h = Column(DECIMAL)
@@ -85,7 +84,7 @@ class MarketTradeMin(Base):
     data_type = Column(Integer)
     market_cap = Column(BigInteger)
     price = Column(DECIMAL(precision=18,scale=8))
-    price_date = Column(DateTime)
+    price_date = Column(BigInteger)
     price_btc = Column(DECIMAL(precision=18,scale=8))
     price_usd = Column(DECIMAL(precision=18,scale=8))
     price_open = Column(DECIMAL(precision=18,scale=8))
@@ -150,7 +149,7 @@ def catch_data(site_name, coin_name, url, data_type):
     prices = []
     if content is not None:
         content_json = json.loads(content)
-        print(content_json)
+        #print(content_json)
         market_cap = content_json['market_cap_by_available_supply']
         price_btc = content_json['price_btc']
         price_usd = content_json['price_usd']
@@ -164,8 +163,8 @@ def catch_data(site_name, coin_name, url, data_type):
         volume_dict = {}
         for v in volume:
             volume_dict[v[0]] = v[1]
-        print(usd_dict)
-        print(volume_dict)
+        #print(usd_dict)
+        #print(volume_dict)
 
         for btc in price_btc:
             price = []
@@ -178,21 +177,23 @@ def catch_data(site_name, coin_name, url, data_type):
             prices.append(price)
 
 
+    print("len prices:", len(prices))
     for price in prices:
         t = price[0]
+        format_time = int(t/(300*1000))*1000*300 + 299*1000
         btc_price = price[1]
         usd_price = price[2]
         volume = price[3]
         cap = price[4]
-        data = db.query(MarketTradeMin).filter_by(coin_id=coin.id, site_id=site.id, tid=t).first()
+        data = db.query(MarketTradeMin).filter_by(coin_id=coin.id, site_id=site.id, tid=format_time, data_type=data_type).first()
         if data is None:
             trade = MarketTradeMin()
             trade.coin_id = coin.id
             trade.site_id = site.id
-            trade.tid = t
+            trade.tid = format_time
             trade.market_cap = cap
             trade.data_type = data_type
-            trade.price_date = datetime.datetime.fromtimestamp(int(t/1000))
+            trade.price_date = datetime.datetime.fromtimestamp(int(format_time/1000))
             trade.price_btc = '{0:.8f}'.format(Decimal(btc_price))
             trade.price_usd = usd_price
             trade.price_open = usd_price
@@ -200,14 +201,27 @@ def catch_data(site_name, coin_name, url, data_type):
             trade.price_high = usd_price
             trade.price_low = usd_price
             trade.volume = volume
-            trade.created_at = datetime.datetime.now()
+            trade.created_at = datetime.datetime.fromtimestamp(int(t/1000))
             db.add(trade)
+        else:
+            # print(type(data.price_usd), type(usd_price))
+            db_price = '{0:.2f}'.format(data.price_usd)
+            new_price = '{0:.2f}'.format(usd_price)
+            if db_price != new_price:
+                data.price_usd = usd_price
+                data.price_open = usd_price
+                data.price_close = usd_price
+                data.price_high = usd_price
+                data.price_low = usd_price
+                data.created_at = datetime.datetime.fromtimestamp(int(t/1000))
+                db.add(data)
+                print("data is not none, update it.",data.price_usd, usd_price,db_price,new_price, format_time, data_type, datetime.datetime.fromtimestamp(int(t/1000)), datetime.datetime.fromtimestamp(int(format_time/1000)))
+            else:
+                print("data is not none", format_time, data_type, datetime.datetime.fromtimestamp(int(format_time/1000)))
     db.commit()
     db.close()
     # print(prices)
-    if len(prices) > 0:
-        qdata = {'site': "coinmarketcap", 'currency':coin_name, 'prices': prices}
-        data_queue.put(qdata)
+    
 
 
 Symbols={
